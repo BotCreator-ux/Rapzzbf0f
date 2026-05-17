@@ -1,0 +1,37 @@
+name: SSH Pterodactyl via Tailscale
+
+on:
+  workflow_dispatch:
+
+jobs:
+  ptero-test:
+    runs-on: ubuntu-22.04 # Wajib Ubuntu buat Pterodactyl & Docker
+    timeout-minutes: 350  # Limit mendekati 6 jam
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Install Tailscale (Linux)
+      run: |
+        curl -fsSL https://tailscale.com/install.sh | sh
+
+    - name: Connect to Tailscale
+      env:
+        TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
+      run: |
+        # Menggunakan auth key dan set hostname otomatis
+        sudo tailscale up --authkey=${TAILSCALE_AUTH_KEY} --hostname=rapzz-runner
+        
+        # Ambil IP Tailscale untuk mastiin koneksi berhasil
+        TS_IP=$(tailscale ip -4)
+        echo "Tailscale IP lu adalah: $TS_IP"
+
+    - name: Keep Alive for 5.5 Hours
+      run: |
+        echo "Runner sekarang online di jaringan Tailscale lu."
+        echo "Silahkan SSH ke IP di atas pake user 'runner' atau 'root'."
+        
+        # Menahan workflow biar gak lari/selesai selama 5,5 jam (19800 detik)
+        sleep 19800
+        
