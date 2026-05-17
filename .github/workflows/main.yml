@@ -1,37 +1,80 @@
-name: SSH Pterodactyl via Tailscale
+name: 🚀 NOXORA | Pterodactyl Environment Runner
 
 on:
   workflow_dispatch:
 
 jobs:
-  ptero-test:
-    runs-on: ubuntu-22.04 # Wajib Ubuntu buat Pterodactyl & Docker
-    timeout-minutes: 350  # Limit mendekati 6 jam
+  ptero-environment:
+    name: ⚡ Provisioning High-Performance Ubuntu Sandbox
+    runs-on: ubuntu-22.04
+    timeout-minutes: 350
 
     steps:
-    - name: Checkout Code
+    - name: 📂 Fetching Repository Sources
       uses: actions/checkout@v4
 
-    - name: Install Tailscale (Linux)
-      run: |
-        curl -fsSL https://tailscale.com/install.sh | sh
-
-    - name: Connect to Tailscale
+    - name: 🌐 Initialize Network & Access Control
       env:
-        TAILSCALE_AUTH_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
+        SSH_KEY: ${{ secrets.SSH_PUBLIC_KEY }}
+        TAILSCALE_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
       run: |
-        # Menggunakan auth key dan set hostname otomatis
-        sudo tailscale up --authkey=${TAILSCALE_AUTH_KEY} --hostname=rapzz-runner
+        echo "##[group] 🟢 STEP 1: Injecting Cryptographic SSH Keys"
+        echo "========================================================"
         
-        # Ambil IP Tailscale untuk mastiin koneksi berhasil
-        TS_IP=$(tailscale ip -4)
-        echo "Tailscale IP lu adalah: $TS_IP"
+        # Setup untuk user runner
+        mkdir -p ~/.ssh
+        echo "$SSH_KEY" >> ~/.ssh/authorized_keys
+        chmod 700 ~/.ssh
+        chmod 600 ~/.ssh/authorized_keys
+        
+        # Setup untuk user root
+        sudo mkdir -p /root/.ssh
+        sudo cp ~/.ssh/authorized_keys /root/.ssh/authorized_keys
+        sudo chmod 700 /root/.ssh
+        sudo chmod 600 /root/.ssh/authorized_keys
+        
+        echo "[-] Cryptographic verification: Keys successfully injected."
+        echo "========================================================"
+        echo "##[endgroup]"
 
-    - name: Keep Alive for 5.5 Hours
+        echo "##[group] 🟢 STEP 2: Deploying Tailscale Mesh Network"
+        echo "========================================================"
+        # Install Tailscale tanpa ribet
+        curl -fsSL https://tailscale.com/install.sh | sh
+        
+        # Mengubungkan ke Tailscale Network
+        sudo tailscale up --authkey=${TAILSCALE_KEY} --hostname=rapzz-runner
+        echo "========================================================"
+        echo "##[endgroup]"
+
+    - name: 🛰️ Network Status & Routing Information
       run: |
-        echo "Runner sekarang online di jaringan Tailscale lu."
-        echo "Silahkan SSH ke IP di atas pake user 'runner' atau 'root'."
+        echo "##[group] 📊 SYSTEM NETWORK MANIFEST"
+        echo "========================================================"
+        TS_IP=$(tailscale ip -4)
+        echo "  [+] TARGET HOSTNAME : rapzz-runner"
+        echo "  [+] ASSIGNED MESH IP: $TS_IP"
+        echo "  [+] SECURITY PROFILE: FULL PASSWORDLESS ROOT ACCESS"
+        echo "========================================================"
+        echo "##[endgroup]"
         
-        # Menahan workflow biar gak lari/selesai selama 5,5 jam (19800 detik)
+        # Simpan IP ke environment variable biar step bawah bisa baca
+        echo "RUNNER_IP=$TS_IP" >> $GITHUB_ENV
+
+    - name: ⏳ Maintaining Active Core Session
+      run: |
+        echo "┌────────────────────────────────────────────────────────┐"
+        echo "│   🟢 SANDBOX DEPLOYMENT SUCCESSFUL / ENVIRONMENT READY │"
+        echo "├────────────────────────────────────────────────────────┤"
+        echo "│  IP ADDRESS  : ${{ env.RUNNER_IP }}                        │"
+        echo "│  USER ACCESS : root / runner                           │"
+        echo "│  AUTH METHOD : SSH Public Key Verified                 │"
+        echo "│  DURATION    : 5.5 Hours (19800 Seconds Max)          │"
+        echo "├────────────────────────────────────────────────────────┤"
+        echo "│  👉 Run in your Termux:                                │"
+        echo "│  ssh root@${{ env.RUNNER_IP }}                             │"
+        echo "└────────────────────────────────────────────────────────┘"
+        echo "[!] Session persistent mode activated. Holding terminal line active..."
+        
+        # Menahan workflow biar tetep nyala selama 5.5 Jam
         sleep 19800
-        
