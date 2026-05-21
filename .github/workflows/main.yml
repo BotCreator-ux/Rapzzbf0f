@@ -1,4 +1,4 @@
-name: 🚀 NOXORA | Pterodactyl Environment Runner
+Name: 🚀 NOXORA | Pterodactyl Environment Runner
 
 on:
   workflow_dispatch:
@@ -61,6 +61,20 @@ jobs:
         # Simpan IP ke environment variable biar step bawah bisa baca
         echo "RUNNER_IP=$TS_IP" >> $GITHUB_ENV
 
+    - name: 🟢 Install Node.js 24 LTS
+      run: |
+        echo "##[group] 📦 Installing Node.js v24 (LTS)"
+        echo "========================================================"
+        # Setup NodeSource repository untuk Node.js 24
+        curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash -
+        # Install Node.js dan npm
+        sudo apt-get install -y nodejs
+        echo "--------------------------------------------------------"
+        echo "  [+] Node.js version: $(node -v)"
+        echo "  [+] NPM version:     $(npm -v)"
+        echo "========================================================"
+        echo "##[endgroup]"
+
     - name: ⏳ Maintaining Active Core Session
       run: |
         echo "┌────────────────────────────────────────────────────────┐"
@@ -69,6 +83,7 @@ jobs:
         echo "│  IP ADDRESS  : ${{ env.RUNNER_IP }}                        │"
         echo "│  USER ACCESS : root / runner                           │"
         echo "│  AUTH METHOD : SSH Public Key Verified                 │"
+        echo "│  NODE VERSION: v24.x LTS                               │"
         echo "│  DURATION    : 5.5 Hours (19800 Seconds Max)          │"
         echo "├────────────────────────────────────────────────────────┤"
         echo "│  👉 Run in your Termux:                                │"
