@@ -1,4 +1,4 @@
-Name: 🚀 NOXORA | Pterodactyl Environment Runner
+name: 🚀 NOXORA | Pterodactyl Environment Runner
 
 on:
   workflow_dispatch:
