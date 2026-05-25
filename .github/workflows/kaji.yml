@@ -64,39 +64,6 @@ jobs:
 
         echo "Chrome installed"
         echo "##[endgroup]"
-
-    - name: 🎮 Install Basic Gaming Utilities
-      run: |
-        echo "##[group] Installing Gaming Packages"
-
-        sudo apt install -y \
-          steam-installer \
-          neofetch \
-          htop \
-          wget \
-          curl \
-          git \
-          unzip
-
-        echo "Gaming tools installed"
-        echo "##[endgroup]"
-
-    - name: 📡 Install XRDP Remote Desktop
-      run: |
-        echo "##[group] Installing XRDP"
-
-        sudo apt install -y xrdp
-        sudo systemctl enable xrdp
-        sudo systemctl restart xrdp
-
-        # Set XFCE as default session
-        echo xfce4-session > ~/.xsession
-
-        sudo adduser xrdp ssl-cert
-
-        echo "XRDP ready"
-        echo "##[endgroup]"
-
     - name: 🔐 Set Password for Runner User
       run: |
         echo "runner:gaming123" | sudo chpasswd
