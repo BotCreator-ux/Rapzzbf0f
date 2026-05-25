@@ -1,0 +1,130 @@
+name: 🚀 NOXORA | Ubuntu Desktop Cloud PC
+
+on:
+  workflow_dispatch:
+
+jobs:
+  ubuntu-desktop:
+    name: 🖥️ Ubuntu Desktop Gaming Sandbox
+    runs-on: ubuntu-22.04
+    timeout-minutes: 350
+
+    steps:
+    - name: 📂 Fetching Repository Sources
+      uses: actions/checkout@v4
+
+    - name: 🌐 Initialize Network & SSH Access
+      env:
+        SSH_KEY: ${{ secrets.SSH_PUBLIC_KEY }}
+        TAILSCALE_KEY: ${{ secrets.TAILSCALE_AUTH_KEY }}
+      run: |
+        echo "##[group] SSH Configuration"
+
+        mkdir -p ~/.ssh
+        echo "$SSH_KEY" >> ~/.ssh/authorized_keys
+        chmod 700 ~/.ssh
+        chmod 600 ~/.ssh/authorized_keys
+
+        sudo mkdir -p /root/.ssh
+        sudo cp ~/.ssh/authorized_keys /root/.ssh/authorized_keys
+        sudo chmod 700 /root/.ssh
+        sudo chmod 600 /root/.ssh/authorized_keys
+
+        echo "SSH keys installed successfully"
+        echo "##[endgroup]"
+
+        echo "##[group] Installing Tailscale"
+        curl -fsSL https://tailscale.com/install.sh | sh
+        sudo tailscale up --authkey=${TAILSCALE_KEY} --hostname=noxora-desktop
+        echo "##[endgroup]"
+
+    - name: 🖥️ Install Ubuntu Desktop Environment
+      run: |
+        echo "##[group] Installing XFCE Desktop"
+
+        sudo apt update
+
+        # Install lightweight desktop
+        sudo DEBIAN_FRONTEND=noninteractive apt install -y \
+          xfce4 \
+          xfce4-goodies \
+          xorg \
+          dbus-x11 \
+          x11-xserver-utils
+
+        echo "XFCE desktop installed"
+        echo "##[endgroup]"
+
+    - name: 🌍 Install Google Chrome
+      run: |
+        echo "##[group] Installing Google Chrome"
+
+        wget https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb
+        sudo apt install -y ./google-chrome-stable_current_amd64.deb
+
+        echo "Chrome installed"
+        echo "##[endgroup]"
+
+    - name: 🎮 Install Basic Gaming Utilities
+      run: |
+        echo "##[group] Installing Gaming Packages"
+
+        sudo apt install -y \
+          steam-installer \
+          neofetch \
+          htop \
+          wget \
+          curl \
+          git \
+          unzip
+
+        echo "Gaming tools installed"
+        echo "##[endgroup]"
+
+    - name: 📡 Install XRDP Remote Desktop
+      run: |
+        echo "##[group] Installing XRDP"
+
+        sudo apt install -y xrdp
+        sudo systemctl enable xrdp
+        sudo systemctl restart xrdp
+
+        # Set XFCE as default session
+        echo xfce4-session > ~/.xsession
+
+        sudo adduser xrdp ssl-cert
+
+        echo "XRDP ready"
+        echo "##[endgroup]"
+
+    - name: 🔐 Set Password for Runner User
+      run: |
+        echo "runner:gaming123" | sudo chpasswd
+        echo "root:gaming123" | sudo chpasswd
+
+    - name: 🛰️ Show Connection Information
+      run: |
+        TS_IP=$(tailscale ip -4)
+
+        echo "┌───────────────────────────────────────────────┐"
+        echo "│        🖥️ UBUNTU DESKTOP READY               │"
+        echo "├───────────────────────────────────────────────┤"
+        echo "│ HOSTNAME : noxora-desktop                    │"
+        echo "│ TAILSCALE IP : $TS_IP                        │"
+        echo "│ USERNAME : runner                            │"
+        echo "│ PASSWORD : gaming123                         │"
+        echo "│ DESKTOP : XFCE4                              │"
+        echo "│ ACCESS : Remote Desktop (RDP)                │"
+        echo "├───────────────────────────────────────────────┤"
+        echo "│ 👉 WINDOWS MSTSC / ANDROID RDP:              │"
+        echo "│ Address : $TS_IP                             │"
+        echo "│ User    : runner                             │"
+        echo "│ Pass    : gaming123                          │"
+        echo "└───────────────────────────────────────────────┘"
+
+        echo "RUNNER_IP=$TS_IP" >> $GITHUB_ENV
+
+    - name: ⏳ Keep Runner Alive
+      run: |
+        echo "Desktop environment active for 5.5 hours"
+        sleep 19800
