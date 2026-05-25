@@ -64,6 +64,40 @@ jobs:
 
         echo "Chrome installed"
         echo "##[endgroup]"
+    - name: 📡 Install XRDP + noVNC Web Desktop
+      run: |
+        echo "##[group] Installing XRDP and noVNC"
+
+        sudo apt install -y \
+          xrdp \
+          tigervnc-standalone-server \
+          novnc \
+          websockify
+
+        # XFCE session
+        echo xfce4-session > ~/.xsession
+
+        # Enable XRDP
+        sudo systemctl enable xrdp
+        sudo systemctl restart xrdp
+
+        # Setup VNC password
+        mkdir -p ~/.vnc
+        echo "gaming123" | vncpasswd -f > ~/.vnc/passwd
+        chmod 600 ~/.vnc/passwd
+
+        # Start VNC server
+        vncserver :1 -geometry 1280x720 -depth 24
+
+        # Start noVNC Web Access
+        nohup websockify \
+          --web=/usr/share/novnc/ \
+          6080 localhost:5901 \
+          > /dev/null 2>&1 &
+
+        echo "XRDP + noVNC ready"
+        echo "##[endgroup]"
+
     - name: 🔐 Set Password for Runner User
       run: |
         echo "runner:gaming123" | sudo chpasswd
@@ -81,12 +115,13 @@ jobs:
         echo "│ USERNAME : runner                            │"
         echo "│ PASSWORD : gaming123                         │"
         echo "│ DESKTOP : XFCE4                              │"
-        echo "│ ACCESS : Remote Desktop (RDP)                │"
+        echo "│ ACCESS : RDP + WEB DESKTOP                │"
         echo "├───────────────────────────────────────────────┤"
         echo "│ 👉 WINDOWS MSTSC / ANDROID RDP:              │"
         echo "│ Address : $TS_IP                             │"
         echo "│ User    : runner                             │"
         echo "│ Pass    : gaming123                          │"
+        echo "│ Web    : http://$TS_IP:6080/vnc.html        │"
         echo "└───────────────────────────────────────────────┘"
 
         echo "RUNNER_IP=$TS_IP" >> $GITHUB_ENV
