@@ -1,0 +1,77 @@
+name: RDP-Rapzz
+on: workflow_dispatch
+
+jobs:
+  secure-rdp:
+    runs-on: windows-latest
+    timeout-minutes: 3600
+
+    steps:
+      - name: Disable Windows Password Complexity
+        run: |
+          # Export policy saat ini ke file teks
+          secedit /export /cfg config.inf
+          # Ganti nilai PasswordComplexity dari 1 (on) ke 0 (off)
+          (Get-Content config.inf) -replace 'PasswordComplexity = 1', 'PasswordComplexity = 0' | Set-Content config.inf
+          # Apply kembali policy yang sudah dimodifikasi
+          secedit /configure /db $env:windir\security\local.sdb /cfg config.inf /areas SECURITYPOLICY
+          # Hapus file sampah
+          Remove-Item config.inf
+
+      - name: Configure Core RDP Settings
+        run: |
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0 -Force
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 0 -Force
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "SecurityLayer" -Value 0 -Force
+          netsh advfirewall firewall delete rule name="RDP-Tailscale"
+          netsh advfirewall firewall add rule name="RDP-Tailscale" dir=in action=allow protocol=TCP localport=3389
+          Restart-Service -Name TermService -Force
+
+      - name: Create RDP User Rapzz
+        run: |
+          # Sekarang kamu bisa pakai password simpel tanpa kena error
+          $password = "RapzzPw" 
+          $securePass = ConvertTo-SecureString $password -AsPlainText -Force
+          
+          New-LocalUser -Name "Rapzz" -Password $securePass -Description "RDP User" -AccountNeverExpires
+          Add-LocalGroupMember -Group "Administrators" -Member "Rapzz"
+          Add-LocalGroupMember -Group "Remote Desktop Users" -Member "Rapzz"
+          
+          echo "RDP_USER=Rapzz" >> $env:GITHUB_ENV
+          echo "RDP_PASS=$password" >> $env:GITHUB_ENV
+
+      - name: Install Tailscale
+        run: |
+          $tsUrl = "https://pkgs.tailscale.com/stable/tailscale-setup-1.82.0-amd64.msi"
+          $installerPath = "$env:TEMP\tailscale.msi"
+          Invoke-WebRequest -Uri $tsUrl -OutFile $installerPath
+          Start-Process msiexec.exe -ArgumentList "/i", "`"$installerPath`"", "/quiet", "/norestart" -Wait
+          Remove-Item $installerPath -Force
+
+      - name: Establish Tailscale Connection
+        run: |
+          & "$env:ProgramFiles\Tailscale\tailscale.exe" up --authkey=${{ secrets.TAILSCALE_AUTH_KEY }} --hostname=rapzz-runner
+          $tsIP = $null
+          $retries = 0
+          while (-not $tsIP -and $retries -lt 10) {
+            $tsIP = & "$env:ProgramFiles\Tailscale\tailscale.exe" ip -4
+            Start-Sleep -Seconds 5
+            $retries++
+          }
+          if (-not $tsIP) { Write-Error "Tailscale IP gagal didapat!"; exit 1 }
+          echo "TAILSCALE_IP=$tsIP" >> $env:GITHUB_ENV
+
+      - name: Maintain Connection & Show Info
+        run: |
+          Write-Host "`n==============================" -ForegroundColor Cyan
+          Write-Host "   RDP BYPASS SUCCESS!" -ForegroundColor Green
+          Write-Host "==============================" -ForegroundColor Cyan
+          Write-Host "IP Address : $env:TAILSCALE_IP"
+          Write-Host "Username   : $env:RDP_USER"
+          Write-Host "Password   : $env:RDP_PASS"
+          Write-Host "==============================`n"
+          while ($true) {
+            $date = Get-Date -Format "HH:mm:ss"
+            Write-Host "[$date] Stayin' alive... 🕺"
+            Start-Sleep -Seconds 300
+          }
