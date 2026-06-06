@@ -15,33 +15,37 @@ jobs:
       - name: Install ADB, Docker Dependencies, and Python
         run: |
           sudo apt-get update
-          sudo apt-get install -y adb python3-pip python3
+          sudo apt-get install -y adb python3-pip python3 linux-modules-extra-$(uname -r)
           pip3 install pure-python-adb --break-system-packages || pip3 install pure-python-adb
           adb start-server
 
-      - name: Setup ReDroid & Web Screen Streamer
+      - name: Setup ReDroid & Web Screen Streamer (Update 2026)
         run: |
-          # Load modul kernel Linux untuk Android Container
+          # 1. Pastikan modul kernel aktif sesuai dokumentasi resmi
           sudo modprobe binder_linux devices="binder,hwbinder,vndbinder"
           sudo modprobe ashmem_linux
           
-          # 1. Jalankan Android ReDroid (Resolution 1280x720)
+          # 2. Jalankan Android ReDroid 11 (Mendukung aplikasi 32-bit & hemat resource VPS)
+          # Menggunakan tambahan parameter gpu_mode=guest karena GitHub Actions tidak punya GPU fisik.
           sudo docker run -d --rm \
             --name redroid \
             --privileged \
+            --pull always \
+            -v ~/data:/data \
             -p 5555:5555 \
             redroid/redroid:11.0.0-latest \
             androidboot.redroid_width=1280 \
             androidboot.redroid_height=720 \
-            androidboot.redroid_dpi=320
+            androidboot.redroid_dpi=320 \
+            androidboot.redroid_gpu_mode=guest
 
           echo "Menunggu Android booting..."
-          sleep 15
+          sleep 20
           adb connect 127.0.0.1:5555
           adb wait-for-device
-          echo "Android ReDroid siap!"
+          echo "Android ReDroid siap dan terhubung ke ADB!"
 
-          # 2. Jalankan Server GUI Web (Biar bisa di-remote dari browser HP kamu via port 8000)
+          # 3. Jalankan Web Remote Dashboard
           sudo docker run -d --rm \
             --name remote-web \
             --net=host \
@@ -56,12 +60,12 @@ jobs:
           {"guest_account_info":{"com.garena.msdk.guest_password":"sendi_QLRMJ_BY_SPIDEERIO_GAMING_U305P","com.garena.msdk.guest_uid":"4666437728"}}
           EOF
 
-          # Push ke path eksternal shared storage
+          # Jalankan perintah push ke folder external storage
           adb shell mkdir -p /sdcard/com.garena.msdk/
           adb push ./ff_guest/guest100067.dat /sdcard/com.garena.msdk/guest100067.dat
           adb shell chmod 666 /sdcard/com.garena.msdk/guest100067.dat
 
-          # Push juga ke path internal sandbox aplikasi (jaga-jaga biar auto-read)
+          # Jalankan perintah push ke folder internal sandbox aplikasi (untuk jaga-jaga)
           adb shell mkdir -p /data/data/com.dts.freefireth/files/
           adb push ./ff_guest/guest100067.dat /data/data/com.dts.freefireth/files/guest100067.dat
           adb shell chmod 777 /data/data/com.dts.freefireth/files/guest100067.dat
@@ -87,23 +91,19 @@ jobs:
               device = devices[0]
               print("Bot Makro AFK Clash Squad Dimulai... 🤖")
               
-              # Loop nonstop 24/7 buat spam tombol dan gerak
               while True:
                   try:
-                      # 1. Simulasi tombol Maju (Swipe dari tengah bawah ke tengah atas)
-                      # Koordinat layar 1280x720 (X1=300, Y1=600 ke X2=300, Y2=300 selama 1.5 detik)
+                      # 1. Simulasi tombol Maju (Swipe dari bawah ke atas)
                       device.shell("input swipe 300 600 300 300 1500")
                       
-                      # 2. Klik posisi Skill Aktif Homer (Misal estimasi posisi tombol skill di koordinat X=1100, Y=500)
-                      # Silakan sesuaikan koordinat tombol ini lewat remote browser nanti
+                      # 2. Klik posisi Skill Aktif Homer (Sesuaikan koordinat lewat browser HP nanti)
                       device.shell("input tap 1100 500")
                       
-                      # 3. Klik tombol 'Mulai/Gas Match' (Jaga-jaga kalau match selesai, biar auto masuk lagi)
-                      # Biasanya di lobby / halaman score tombol ada di pojok kanan bawah (X=1150, Y=650)
+                      # 3. Klik tombol 'Mulai/Gas Match' di kanan bawah screen
                       device.shell("input tap 1150 650")
                       
-                      print("Bot Action: Maju + Spam Skill Homer + Check Ready.")
-                      time.sleep(2) # Jeda per aksi
+                      print("Bot Action: Maju + Spam Skill Homer + Auto Ready.")
+                      time.sleep(2)
                       
                   except Exception as e:
                       print(f"Ada error/DC, mencoba ulang... Error: {e}")
@@ -126,11 +126,11 @@ jobs:
           echo -e "   http://$TS_IP:8000"
           echo -e "==================================================\n"
           
-          # Jalankan script macro Python di background agar loop berjalan mandiri
+          # Jalankan script macro Python di background
           python3 bot_macro.py &
           
-          # Keep Alive Runner biar ga mati selama 6 jam
+          # Keep Alive Runner biar ga mati otomatis selama batas waktu GitHub
           while true; do
-            echo "[$(date +%H:%M:%S)] Container Android & Macro Bot is alive... 🕺"
+            echo "[$(date +%H:%M:%S)] Container Android & Macro Bot is alive... 🤖🕺"
             sleep 300
           done
