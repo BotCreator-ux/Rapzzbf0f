@@ -19,14 +19,12 @@ jobs:
           pip3 install pure-python-adb --break-system-packages || pip3 install pure-python-adb
           adb start-server
 
-      - name: Setup ReDroid & Web Screen Streamer (Update 2026)
+      - name: Setup ReDroid & Web Screen Streamer (Fix Ashmem Error)
         run: |
-          # 1. Pastikan modul kernel aktif sesuai dokumentasi resmi
-          sudo modprobe binder_linux devices="binder,hwbinder,vndbinder"
-          sudo modprobe ashmem_linux
+          # 1. Cukup load binder_linux saja, abaikan jika sudah aktif (|| true)
+          sudo modprobe binder_linux devices="binder,hwbinder,vndbinder" || true
           
-          # 2. Jalankan Android ReDroid 11 (Mendukung aplikasi 32-bit & hemat resource VPS)
-          # Menggunakan tambahan parameter gpu_mode=guest karena GitHub Actions tidak punya GPU fisik.
+          # 2. Jalankan ReDroid dengan bypassuse_memfd=true untuk kernel Linux baru
           sudo docker run -d --rm \
             --name redroid \
             --privileged \
@@ -37,15 +35,25 @@ jobs:
             androidboot.redroid_width=1280 \
             androidboot.redroid_height=720 \
             androidboot.redroid_dpi=320 \
-            androidboot.redroid_gpu_mode=guest
+            androidboot.redroid_gpu_mode=guest \
+            androidboot.use_memfd=true
 
           echo "Menunggu Android booting..."
-          sleep 20
+          sleep 25
           adb connect 127.0.0.1:5555
-          adb wait-for-device
+          
+          # Sistem auto-retry koneksi ADB jika container butuh waktu loading tambahan
+          max_try=5
+          until adb wait-for-device || [ $max_try -le 0 ]; do
+            echo "Mencoba menyambungkan kembali ke ADB..."
+            adb connect 127.0.0.1:5555
+            let max_try--
+            sleep 5
+          done
+
           echo "Android ReDroid siap dan terhubung ke ADB!"
 
-          # 3. Jalankan Web Remote Dashboard
+          # 3. Jalankan Web Remote Dashboard (ws-scrcpy) untuk browser HP
           sudo docker run -d --rm \
             --name remote-web \
             --net=host \
@@ -55,17 +63,17 @@ jobs:
         run: |
           mkdir -p ./ff_guest
           
-          # Write data json guest mu ke file lokal
+          # Tulis isi JSON akun guest kamu langsung ke file pengenal
           cat << 'EOF' > ./ff_guest/guest100067.dat
           {"guest_account_info":{"com.garena.msdk.guest_password":"sendi_QLRMJ_BY_SPIDEERIO_GAMING_U305P","com.garena.msdk.guest_uid":"4666437728"}}
           EOF
 
-          # Jalankan perintah push ke folder external storage
+          # Push ke shared storage eksternal (/sdcard/)
           adb shell mkdir -p /sdcard/com.garena.msdk/
           adb push ./ff_guest/guest100067.dat /sdcard/com.garena.msdk/guest100067.dat
           adb shell chmod 666 /sdcard/com.garena.msdk/guest100067.dat
 
-          # Jalankan perintah push ke folder internal sandbox aplikasi (untuk jaga-jaga)
+          # Push ke data sandbox internal aplikasi game FF (antisipasi auto-read)
           adb shell mkdir -p /data/data/com.dts.freefireth/files/
           adb push ./ff_guest/guest100067.dat /data/data/com.dts.freefireth/files/guest100067.dat
           adb shell chmod 777 /data/data/com.dts.freefireth/files/guest100067.dat
@@ -91,15 +99,16 @@ jobs:
               device = devices[0]
               print("Bot Makro AFK Clash Squad Dimulai... 🤖")
               
+              # Loop penekanan tombol otomatis 24/7
               while True:
                   try:
                       # 1. Simulasi tombol Maju (Swipe dari bawah ke atas)
                       device.shell("input swipe 300 600 300 300 1500")
                       
-                      # 2. Klik posisi Skill Aktif Homer (Sesuaikan koordinat lewat browser HP nanti)
+                      # 2. Klik posisi Skill Aktif Homer (Bisa disesuaikan koordinatnya nanti)
                       device.shell("input tap 1100 500")
                       
-                      # 3. Klik tombol 'Mulai/Gas Match' di kanan bawah screen
+                      # 3. Klik tombol 'Mulai/Gas Match' di lobby / halaman pasca match
                       device.shell("input tap 1150 650")
                       
                       print("Bot Action: Maju + Spam Skill Homer + Auto Ready.")
@@ -126,10 +135,10 @@ jobs:
           echo -e "   http://$TS_IP:8000"
           echo -e "==================================================\n"
           
-          # Jalankan script macro Python di background
+          # Jalankan script macro Python di background agar loop tidak menahan terminal utama
           python3 bot_macro.py &
           
-          # Keep Alive Runner biar ga mati otomatis selama batas waktu GitHub
+          # Keep Alive Runner biar server GitHub Actions ga mati otomatis
           while true; do
             echo "[$(date +%H:%M:%S)] Container Android & Macro Bot is alive... 🤖🕺"
             sleep 300
