@@ -1,12 +1,26 @@
 import marshal,base64,zlib,hashlib,sys,random
 import sys as _s
 import ctypes as _c
-def _():
- if _s.gettrace() is not None:_s.exit(0)
- try:
-  if hasattr(_c,'windll') and _c.windll.kernel32.IsDebuggerPresent():_s.exit(0)
- except:pass
-_()
+# --- AWAL BYPASS TRAFIK KEY ---
+import requests
+
+original_post = requests.post
+
+def custom_post(url, *args, **kwargs):
+    # Jika script mendeteksi IP lisensi bawaan, belokkan ke Pterodactyl kamu
+    if "143.20.37.172:6105" in url:
+        url = url.replace("143.20.37.172:6105", "node.ngr.web.id:4506")
+    return original_post(url, *args, **kwargs)
+
+requests.post = custom_post
+# --- AKHIR BYPASS TRAFIK KEY ---
+
+#def _():
+# if _s.gettrace() is not None:_s.exit(0)
+# try:
+#  if hasattr(_c,'windll') and _c.windll.kernel32.IsDebuggerPresent():_s.exit(0)
+# except:pass
+#_()
 mntkr=866979
 rgjjz=280854
 otgdp=984768
