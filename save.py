@@ -1,18 +1,16 @@
 import os
 import shutil
 import zipfile
-import urllib.request
 import tkinter as tk
-from tkinter import messagebox, simpledialog, ttk
+from tkinter import messagebox, filedialog, ttk
 
-# Path Browser & Roblox
+# Path Browser, Roblox, dan Folder Standar
 CHROME_PATH = os.path.expandvars(r'%LOCALAPPDATA%\Google\Chrome\User Data')
 EDGE_PATH = os.path.expandvars(r'%LOCALAPPDATA%\Microsoft\Edge\User Data')
 ROBLOX_REG_PATH = r"Software\Roblox\RobloxStudio"
 
-TEMP_ZIP = os.path.expandvars(r'%TEMP%\cloud_pc_backup.zip')
+DEFAULT_DIR = os.path.join(os.path.expanduser('~'), 'Downloads')
 ROBLOX_REG_FILE = os.path.expandvars(r'%TEMP%\roblox_login.reg')
-CATBOX_API_URL = "https://catbox.moe/user/api.php"
 
 def backup_folder(source_path, zip_object, arc_folder_name):
     if os.path.exists(source_path):
@@ -23,44 +21,16 @@ def backup_folder(source_path, zip_object, arc_folder_name):
                 full_path = os.path.join(root_dir, file)
                 rel_path = os.path.relpath(full_path, source_path)
                 
-                # --- FIX ERROR TIMESTAMPS BEFORE 1980 ---
+                # Fix Bug Timestamps Sebelum 1980
                 try:
                     zinfo = zipfile.ZipInfo.from_file(full_path, os.path.join(arc_folder_name, rel_path))
-                    
-                    # Jika timestamp file di bawah tahun 1980, paksa set ke 1980 agar ZIP tidak crash
                     if zinfo.date_time[0] < 1980:
                         zinfo.date_time = (1980, 1, 1, 0, 0, 0)
                         
                     with open(full_path, 'rb') as f:
                         zip_object.writestr(zinfo, f.read(), zipfile.ZIP_DEFLATED)
                 except Exception:
-                    # Lewati file jika corrupt atau dikunci oleh sistem lain
                     continue
-
-def upload_to_catbox(file_path):
-    boundary = '----WebKitFormBoundary7MA4YWxkTrZu0gW'
-    data = []
-    data.append(f'--{boundary}'.encode('utf-8'))
-    data.append('Content-Disposition: form-data; name="reqtype"'.encode('utf-8'))
-    data.append(''.encode('utf-8'))
-    data.append('fileupload'.encode('utf-8'))
-    
-    data.append(f'--{boundary}'.encode('utf-8'))
-    data.append(f'Content-Disposition: form-data; name="fileToUpload"; filename="{os.path.basename(file_path)}"'.encode('utf-8'))
-    data.append('Content-Type: application/zip'.encode('utf-8'))
-    data.append(''.encode('utf-8'))
-    
-    with open(file_path, 'rb') as f:
-        data.append(f.read())
-    data.append(f'--{boundary}--'.encode('utf-8'))
-    
-    payload = b'\r\n'.join(data)
-    req = urllib.request.Request(CATBOX_API_URL, data=payload)
-    req.add_header('Content-Type', f'multipart/form-data; boundary={boundary}')
-    req.add_header('User-Agent', 'Mozilla/5.0')
-    
-    with urllib.request.urlopen(req) as response:
-        return response.read().decode('utf-8').strip()
 
 def toggle_save_all():
     val = save_all_var.get()
@@ -79,23 +49,34 @@ def run_save():
         messagebox.showwarning("Peringatan", "Pilih minimal satu aplikasi untuk di-save!")
         return
         
+    # --- PILIH FOLDER TERLEBIH DAHULU ---
+    selected_dir = filedialog.askdirectory(
+        initialdir=DEFAULT_DIR,
+        title="Pilih Folder Lokasi Menyimpan File ZIP Backup"
+    )
+    
+    if not selected_dir:
+        return  # Batal jika user menutup jendela folder picker
+
+    final_zip_path = os.path.join(selected_dir, 'cloud_pc_backup.zip')
+
     try:
         update_status("Menutup browser otomatis...", "#f9e2af")
         root.update()
         
-        # --- FIX ERRNO 13: PAKSA TUTUP BROWSER BIAR LOCKFILE TIDAK DIKUNCI ---
+        # Kill browser biar lockfile lepas
         if save_chrome_var.get():
             os.system("taskkill /f /im chrome.exe >nul 2>&1")
         if save_edge_var.get():
             os.system("taskkill /f /im msedge.exe >nul 2>&1")
             
-        update_status("Membuat file backup... Mohon tunggu.", "#f9e2af")
+        update_status("Membuat file ZIP di folder pilihan...", "#f9e2af")
         root.update()
         
-        if os.path.exists(TEMP_ZIP):
-            os.remove(TEMP_ZIP)
+        if os.path.exists(final_zip_path):
+            os.remove(final_zip_path)
 
-        with zipfile.ZipFile(TEMP_ZIP, 'w', zipfile.ZIP_DEFLATED) as zipf:
+        with zipfile.ZipFile(final_zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
             if save_chrome_var.get() and os.path.exists(CHROME_PATH):
                 backup_folder(CHROME_PATH, zipf, 'Chrome')
             if save_edge_var.get() and os.path.exists(EDGE_PATH):
@@ -109,17 +90,8 @@ def run_save():
                 except:
                     pass
 
-        update_status("Mengupload ke Cloud Catbox...", "#89b4fa")
-        root.update()
-        
-        download_url = upload_to_catbox(TEMP_ZIP)
-        if os.path.exists(TEMP_ZIP):
-            os.remove(TEMP_ZIP)
-
-        root.clipboard_clear()
-        root.clipboard_append(download_url)
-        update_status("Backup Berhasil! Link disalin.", "#a6e3a1")
-        messagebox.showinfo("Sukses Ter-Upload!", f"Data berhasil disimpan di Cloud!\n\nLink Lo:\n{download_url}\n\n(Link otomatis tersalin ke clipboard!)")
+        update_status("Backup Berhasil!", "#a6e3a1")
+        messagebox.showinfo("Sukses", f"Berhasil dibungkus jadi ZIP!\n\nFile tersimpan di:\n{final_zip_path}\n\nSilahkan amankan file tersebut! 🥰")
     except Exception as e:
         update_status("Proses Save Gagal!", "#f38ba8")
         messagebox.showerror("Error", f"Terjadi kesalahan: {str(e)}")
@@ -129,27 +101,28 @@ def run_load():
         messagebox.showwarning("Peringatan", "Pilih minimal satu aplikasi untuk di-load!")
         return
         
-    url_input = simpledialog.askstring("Load Data", "Masukkan URL Link Catbox lo:")
-    if not url_input: return
-    if "catbox.moe" not in url_input:
-        messagebox.showerror("Error", "Link tidak valid!")
+    # Membuka file picker langsung mengarah ke default dir
+    selected_zip = filedialog.askopenfilename(
+        initialdir=DEFAULT_DIR,
+        title="Pilih File Backup ZIP Lo",
+        filetypes=[("ZIP Files", "*.zip")]
+    )
+    
+    if not selected_zip:
         return
 
     try:
-        update_status("Downloading dari Cloud...", "#89b4fa")
-        root.update()
-        urllib.request.urlretrieve(url_input, TEMP_ZIP)
-        
-        update_status("Restoring data...", "#f9e2af")
+        update_status("Mengekstrak data backup...", "#f9e2af")
         root.update()
 
-        # Matikan browser target sebelum merestore biar overwrite aman
+        # Matikan browser target sebelum merestore
         if load_chrome_var.get(): os.system("taskkill /f /im chrome.exe >nul 2>&1")
         if load_edge_var.get(): os.system("taskkill /f /im msedge.exe >nul 2>&1")
 
         temp_extract = os.path.expandvars(r'%TEMP%\temp_cloud_restore')
         if os.path.exists(temp_extract): shutil.rmtree(temp_extract)
-        with zipfile.ZipFile(TEMP_ZIP, 'r') as zip_ref:
+        
+        with zipfile.ZipFile(selected_zip, 'r') as zip_ref:
             zip_ref.extractall(temp_extract)
 
         if load_chrome_var.get() and os.path.exists(os.path.join(temp_extract, 'Chrome')):
@@ -164,7 +137,6 @@ def run_load():
             os.system(f'reg import "{os.path.join(temp_extract, "roblox_login.reg")}"')
 
         shutil.rmtree(temp_extract)
-        if os.path.exists(TEMP_ZIP): os.remove(TEMP_ZIP)
 
         update_status("Load Berhasil! Semua Akun Siap.", "#a6e3a1")
         messagebox.showinfo("Sukses", "Mantap! Data pilihan lo berhasil di-restore!")
@@ -187,7 +159,6 @@ style.configure('TNotebook', background='#1e1e2e', borderwidth=0)
 style.configure('TNotebook.Tab', background='#313244', foreground='#cdd6f4', padding=[15, 5], font=('Arial', 10, 'bold'))
 style.map('TNotebook.Tab', background=[('selected', '#b4befe')], foreground=[('selected', '#11111b')])
 
-# FIX TKINTER PADDING BUG: Menggunakan padx dan pady (bukan padding=10)
 header_frame = tk.Frame(root, bg="#11111b", padx=10, pady=10)
 header_frame.pack(fill="x")
 logo_title = tk.Label(header_frame, text="🤖 Rapzz Save Manager", font=("Arial", 16, "bold"), bg="#11111b", fg="#cba6f7")
@@ -218,7 +189,7 @@ tk.Checkbutton(tab_load, text="ALL (PILIH SEMUA)", variable=load_all_var, comman
 tk.Checkbutton(tab_load, text="GOOGLE CHROME", variable=load_chrome_var, bg="#1e1e2e", fg="#cdd6f4", selectcolor="#313244").pack(anchor="w", padx=60, pady=2)
 tk.Checkbutton(tab_load, text="ROBLOX STUDIO", variable=load_roblox_var, bg="#1e1e2e", fg="#cdd6f4", selectcolor="#313244").pack(anchor="w", padx=60, pady=2)
 tk.Checkbutton(tab_load, text="MICROSOFT EDGE", variable=load_edge_var, bg="#1e1e2e", fg="#cdd6f4", selectcolor="#313244").pack(anchor="w", padx=60, pady=2)
-tk.Button(tab_load, text="⚡ DOWNLOAD & RESTORE", font=("Arial", 11, "bold"), bg="#a6e3a1", fg="#11111b", width=25, command=run_load, bd=0, cursor="hand2").pack(pady=15)
+tk.Button(tab_load, text="⚡ SELECT ZIP & RESTORE", font=("Arial", 11, "bold"), bg="#a6e3a1", fg="#11111b", width=25, command=run_load, bd=0, cursor="hand2").pack(pady=15)
 
 # TAB 3: CREDIT
 tab_credit = tk.Frame(notebook, bg="#1e1e2e")
@@ -227,7 +198,7 @@ tk.Label(tab_credit, text="THANKS TO", font=("Arial", 12, "bold"), bg="#1e1e2e",
 tk.Label(tab_credit, text="👑 RAPZZ DEV", font=("Arial", 14, "bold"), bg="#1e1e2e", fg="#cba6f7").pack(pady=5)
 tk.Label(tab_credit, text="🤖 GEMINI (FOR CODE)", font=("Arial", 11, "italic"), bg="#1e1e2e", fg="#94e2d5").pack(pady=5)
 
-status_label = tk.Label(root, text="Status: Ready", font=("Arial", 9, "italic"), bg="#1e1e2e", fg="#a6adc8")
+status_label = tk.Label(root, text="Status: Ready (Custom Folder Mode)", font=("Arial", 9, "italic"), bg="#1e1e2e", fg="#a6adc8")
 status_label.pack(side="bottom", fill="x", pady=5)
 
 root.mainloop()
