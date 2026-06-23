@@ -2,26 +2,21 @@ import os
 import shutil
 import zipfile
 import urllib.request
-import urllib.parse
 import tkinter as tk
-from tkinter import messagebox, simpledialog
+from tkinter import messagebox, simpledialog, ttk
 
 # Path Browser & Roblox
 CHROME_PATH = os.path.expandvars(r'%LOCALAPPDATA%\Google\Chrome\User Data')
 EDGE_PATH = os.path.expandvars(r'%LOCALAPPDATA%\Microsoft\Edge\User Data')
 ROBLOX_REG_PATH = r"Software\Roblox\RobloxStudio"
 
-# File Sementara
 TEMP_ZIP = os.path.expandvars(r'%TEMP%\cloud_pc_backup.zip')
 ROBLOX_REG_FILE = os.path.expandvars(r'%TEMP%\roblox_login.reg')
-
-# API Catbox
 CATBOX_API_URL = "https://catbox.moe/user/api.php"
 
 def backup_folder(source_path, zip_object, arc_folder_name):
     if os.path.exists(source_path):
         for root_dir, dirs, files in os.walk(source_path):
-            # Skip cache biar ukurannya cuma puluhan MB!
             if 'Cache' in root_dir or 'System Profile' in root_dir:
                 continue
             for file in files:
@@ -30,30 +25,23 @@ def backup_folder(source_path, zip_object, arc_folder_name):
                 zip_object.write(full_path, os.path.join(arc_folder_name, rel_path))
 
 def upload_to_catbox(file_path):
-    """Fungsi untuk upload anonymous ke Catbox via API multipart/form-data"""
     boundary = '----WebKitFormBoundary7MA4YWxkTrZu0gW'
     data = []
-    
-    # Argumen 1: reqtype = fileupload
     data.append(f'--{boundary}'.encode('utf-8'))
     data.append('Content-Disposition: form-data; name="reqtype"'.encode('utf-8'))
     data.append(''.encode('utf-8'))
     data.append('fileupload'.encode('utf-8'))
     
-    # Argumen 2: fileToUpload (Isi file zip)
     data.append(f'--{boundary}'.encode('utf-8'))
     data.append(f'Content-Disposition: form-data; name="fileToUpload"; filename="{os.path.basename(file_path)}"'.encode('utf-8'))
     data.append('Content-Type: application/zip'.encode('utf-8'))
     data.append(''.encode('utf-8'))
     
     with open(file_path, 'rb') as f:
-        file_content = f.read()
-    data.append(file_content)
+        data.append(f.read())
     data.append(f'--{boundary}--'.encode('utf-8'))
     
-    # Gabungkan semua data payload
     payload = b'\r\n'.join(data)
-    
     req = urllib.request.Request(CATBOX_API_URL, data=payload)
     req.add_header('Content-Type', f'multipart/form-data; boundary={boundary}')
     req.add_header('User-Agent', 'Mozilla/5.0')
@@ -61,129 +49,183 @@ def upload_to_catbox(file_path):
     with urllib.request.urlopen(req) as response:
         return response.read().decode('utf-8').strip()
 
-def auto_save_and_upload():
+# Fungsi Otomatis Centang Semua (ALL)
+def toggle_save_all():
+    val = save_all_var.get()
+    save_chrome_var.set(val)
+    save_roblox_var.set(val)
+    save_edge_var.set(val)
+
+def toggle_load_all():
+    val = load_all_var.get()
+    load_chrome_var.set(val)
+    load_roblox_var.set(val)
+    load_edge_var.set(val)
+
+# Eksekusi Save
+def run_save():
+    if not (save_chrome_var.get() or save_roblox_var.get() or save_edge_var.get()):
+        messagebox.showwarning("Peringatan", "Pilih minimal satu aplikasi untuk di-save!")
+        return
+        
     try:
-        status_label.config(text="Zipping data... Mohon tunggu.", fg="#f9e2af")
-        root.update()
-
-        # 1. Export Registry Roblox
-        try:
-            os.system(f'reg export "HKEY_CURRENT_USER\\{ROBLOX_REG_PATH}" "{ROBLOX_REG_FILE}" /y')
-            has_roblox = True
-        except:
-            has_roblox = False
-
-        # 2. Packing ke ZIP
+        update_status("Membuat file backup... Mohon tunggu.", "#f9e2af")
+        
         if os.path.exists(TEMP_ZIP):
             os.remove(TEMP_ZIP)
 
         with zipfile.ZipFile(TEMP_ZIP, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            if os.path.exists(CHROME_PATH):
+            # Save Chrome
+            if save_chrome_var.get() and os.path.exists(CHROME_PATH):
                 backup_folder(CHROME_PATH, zipf, 'Chrome')
-            if os.path.exists(EDGE_PATH):
+            # Save Edge
+            if save_edge_var.get() and os.path.exists(EDGE_PATH):
                 backup_folder(EDGE_PATH, zipf, 'Edge')
-            if has_roblox and os.path.exists(ROBLOX_REG_FILE):
-                zipf.write(ROBLOX_REG_FILE, 'roblox_login.reg')
-                os.remove(ROBLOX_REG_FILE)
+            # Save Roblox
+            if save_roblox_var.get():
+                try:
+                    os.system(f'reg export "HKEY_CURRENT_USER\\{ROBLOX_REG_PATH}" "{ROBLOX_REG_FILE}" /y')
+                    if os.path.exists(ROBLOX_REG_FILE):
+                        zipf.write(ROBLOX_REG_FILE, 'roblox_login.reg')
+                        os.remove(ROBLOX_REG_FILE)
+                except:
+                    pass
 
-        # 3. Otomatis Upload ke Catbox
-        status_label.config(text="Mengupload ke Catbox cloud...", fg="#89b4fa")
+        update_status("Mengupload ke Cloud Catbox...", "#89b4fa")
         root.update()
         
         download_url = upload_to_catbox(TEMP_ZIP)
-        
-        # Hapus file zip sementara di lokal
         if os.path.exists(TEMP_ZIP):
             os.remove(TEMP_ZIP)
 
-        status_label.config(text="Upload Berhasil!", fg="#a6e3a1")
-        
-        # Tampilkan Link dan otomatis salin ke clipboard
         root.clipboard_clear()
         root.clipboard_append(download_url)
-        messagebox.showinfo("Sukses Ter-Upload!", f"Data BERHASIL disimpan di Cloud Catbox!\n\nLink Lo:\n{download_url}\n\n(Link sudah otomatis tersalin ke Clipboard lo, tinggal paste/simpan aja!)")
-        
+        update_status("Backup Berhasil! Link disalin.", "#a6e3a1")
+        messagebox.showinfo("Sukses Ter-Upload!", f"Data berhasil disimpan di Cloud!\n\nLink Lo:\n{download_url}\n\n(Link otomatis tersalin ke clipboard!)")
     except Exception as e:
-        status_label.config(text="Proses Gagal!", fg="#f38ba8")
-        messagebox.showerror("Error", f"Terjadi kesalahan: {str(e)}\n(Pastikan browser & Roblox sudah ditutup)")
+        update_status("Proses Save Gagal!", "#f38ba8")
+        messagebox.showerror("Error", f"Terjadi kesalahan: {str(e)}")
 
-def download_and_load():
-    # Minta user input link Catbox-nya
-    url_input = simpledialog.askstring("Load Data", "Masukkan URL Link Catbox lo:\n(Contoh: https://files.catbox.moe/xxxxxx.zip)")
-    
-    if not url_input:
+# Eksekusi Load
+def run_load():
+    if not (load_chrome_var.get() or load_roblox_var.get() or load_edge_var.get()):
+        messagebox.showwarning("Peringatan", "Pilih minimal satu aplikasi untuk di-load!")
         return
         
+    url_input = simpledialog.askstring("Load Data", "Masukkan URL Link Catbox lo:")
+    if not url_input: return
     if "catbox.moe" not in url_input:
-        messagebox.showerror("Error", "Link yang lo masukkan bukan link Catbox yang valid!")
+        messagebox.showerror("Error", "Link tidak valid!")
         return
 
     try:
-        status_label.config(text="Mendownload data dari Cloud...", fg="#89b4fa")
+        update_status("Downloading dari Cloud...", "#89b4fa")
         root.update()
-        
-        # Download file ZIP dari Catbox
         urllib.request.urlretrieve(url_input, TEMP_ZIP)
         
-        status_label.config(text="Sedang merestore data...", fg="#f9e2af")
+        update_status("Restoring data...", "#f9e2af")
         root.update()
 
-        # Ekstrak data
         temp_extract = os.path.expandvars(r'%TEMP%\temp_cloud_restore')
-        if os.path.exists(temp_extract):
-            shutil.rmtree(temp_extract)
-            
+        if os.path.exists(temp_extract): shutil.rmtree(temp_extract)
         with zipfile.ZipFile(TEMP_ZIP, 'r') as zip_ref:
             zip_ref.extractall(temp_extract)
 
-        # 1. Restore Chrome
-        chrome_src = os.path.join(temp_extract, 'Chrome')
-        if os.path.exists(chrome_src):
-            if os.path.exists(CHROME_PATH):
-                shutil.rmtree(CHROME_PATH)
-            shutil.copytree(chrome_src, CHROME_PATH)
+        # Restore berdasarkan pilihan
+        if load_chrome_var.get() and os.path.exists(os.path.join(temp_extract, 'Chrome')):
+            if os.path.exists(CHROME_PATH): shutil.rmtree(CHROME_PATH)
+            shutil.copytree(os.path.join(temp_extract, 'Chrome'), CHROME_PATH)
+            
+        if load_edge_var.get() and os.path.exists(os.path.join(temp_extract, 'Edge')):
+            if os.path.exists(EDGE_PATH): shutil.rmtree(EDGE_PATH)
+            shutil.copytree(os.path.join(temp_extract, 'Edge'), EDGE_PATH)
+            
+        if load_roblox_var.get() and os.path.exists(os.path.join(temp_extract, 'roblox_login.reg')):
+            os.system(f'reg import "{os.path.join(temp_extract, "roblox_login.reg")}"')
 
-        # 2. Restore Edge
-        edge_src = os.path.join(temp_extract, 'Edge')
-        if os.path.exists(edge_src):
-            if os.path.exists(EDGE_PATH):
-                shutil.rmtree(EDGE_PATH)
-            shutil.copytree(edge_src, EDGE_PATH)
-
-        # 3. Restore Registry Roblox
-        roblox_reg_src = os.path.join(temp_extract, 'roblox_login.reg')
-        if os.path.exists(roblox_reg_src):
-            os.system(f'reg import "{roblox_reg_src}"')
-
-        # Bersihkan sisa file
         shutil.rmtree(temp_extract)
-        if os.path.exists(TEMP_ZIP):
-            os.remove(TEMP_ZIP)
+        if os.path.exists(TEMP_ZIP): os.remove(TEMP_ZIP)
 
-        status_label.config(text="Load All Berhasil! Semua Akun Siap.", fg="#a6e3a1")
-        messagebox.showinfo("Sukses", "Mantap! Semua akun (Chrome, Edge, Roblox) otomatis login kembali!")
-        
+        update_status("Load Berhasil! Semua Akun Siap.", "#a6e3a1")
+        messagebox.showinfo("Sukses", "Mantap! Data pilihan lo berhasil di-restore!")
     except Exception as e:
-        status_label.config(text="Load Gagal!", fg="#f38ba8")
-        messagebox.showerror("Error", f"Gagal restore data: {str(e)}\n(Pastikan link benar & browser ditutup!)")
+        update_status("Load Gagal!", "#f38ba8")
+        messagebox.showerror("Error", f"Gagal restore: {str(e)}")
 
-# GUI Dashboard (Cyberpunk Dark Theme)
+def update_status(text, color):
+    status_label.config(text=f"Status: {text}", fg=color)
+
+# Setup GUI Utama
 root = tk.Tk()
-root.title("Cloud PC Auto-Cloud Save Manager")
-root.geometry("450x280")
+root.title("Rapzz Save Manager")
+root.geometry("450x380")
 root.configure(bg="#1e1e2e")
 
-title_label = tk.Label(root, text="CLOUD PC SAVE MANAGER V3", font=("Arial", 14, "bold"), bg="#1e1e2e", fg="#cba6f7")
-title_label.pack(pady=15)
+# Custom UI Style untuk Tab Kontrol
+style = ttk.Style()
+style.theme_use('default')
+style.configure('TNotebook', background='#1e1e2e', borderwidth=0)
+style.configure('TNotebook.Tab', background='#313244', foreground='#cdd6f4', padding=[15, 5], font=('Arial', 10, 'bold'))
+style.map('TNotebook.Tab', background=[('selected', '#b4befe')], foreground=[('selected', '#11111b')])
 
-btn_backup = tk.Button(root, text="🔥 AUTO SAVE TO CLOUD", font=("Arial", 11, "bold"), bg="#89b4fa", fg="#11111b", width=28, command=auto_save_and_upload)
-btn_backup.pack(pady=10)
+# Header Banner
+header_frame = tk.Frame(root, bg="#11111b", padding=10)
+header_frame.pack(fill="x")
+logo_title = tk.Label(header_frame, text="🤖 Rapzz Save Manager", font=("Arial", 16, "bold"), bg="#11111b", fg="#cba6f7")
+logo_title.pack()
 
-btn_restore = tk.Button(root, text="⚡ DOWNLOAD & LOAD ALL", font=("Arial", 11, "bold"), bg="#a6e3a1", fg="#11111b", width=28, command=download_and_load)
-btn_restore.pack(pady=10)
+# Tab System
+notebook = ttk.Notebook(root)
+notebook.pack(fill="both", expand=True, padx=10, pady=10)
 
-status_label = tk.Label(root, text="Status: Ready (Fitur Cloud Catbox Aktif)", font=("Arial", 9, "italic"), bg="#1e1e2e", fg="#a6adc8")
-status_label.pack(pady=20)
+# Variabel Checkbox (Save)
+save_all_var = tk.BooleanVar()
+save_chrome_var = tk.BooleanVar(value=True)
+save_roblox_var = tk.BooleanVar()
+save_edge_var = tk.BooleanVar()
+
+# Variabel Checkbox (Load)
+load_all_var = tk.BooleanVar()
+load_chrome_var = tk.BooleanVar(value=True)
+load_roblox_var = tk.BooleanVar()
+load_edge_var = tk.BooleanVar()
+
+# --- TAB 1: SAVE ---
+tab_save = tk.Frame(notebook, bg="#1e1e2e")
+notebook.add(tab_save, text=" SAVE ")
+
+tk.Label(tab_save, text="PILIH DATA YANG MAU DI-SAVE:", font=("Arial", 10, "bold"), bg="#1e1e2e", fg="#a6adc8").pack(pady=10)
+tk.Checkbutton(tab_save, text="ALL (PILIH SEMUA)", variable=save_all_var, command=toggle_save_all, bg="#1e1e2e", fg="#f9e2af", selectcolor="#313244", activebackground="#1e1e2e", activeforeground="#f9e2af", font=("Arial", 10, "bold")).pack(anchor="w", padx=40, pady=2)
+tk.Checkbutton(tab_save, text="GOOGLE CHROME", variable=save_chrome_var, bg="#1e1e2e", fg="#cdd6f4", selectcolor="#313244", activebackground="#1e1e2e", activeforeground="#cdd6f4").pack(anchor="w", padx=60, pady=2)
+tk.Checkbutton(tab_save, text="ROBLOX STUDIO", variable=save_roblox_var, bg="#1e1e2e", fg="#cdd6f4", selectcolor="#313244", activebackground="#1e1e2e", activeforeground="#cdd6f4").pack(anchor="w", padx=60, pady=2)
+tk.Checkbutton(tab_save, text="MICROSOFT EDGE", variable=save_edge_var, bg="#1e1e2e", fg="#cdd6f4", selectcolor="#313244", activebackground="#1e1e2e", activeforeground="#cdd6f4").pack(anchor="w", padx=60, pady=2)
+
+btn_run_save = tk.Button(tab_save, text="🔥 EXECUTE AUTO SAVE", font=("Arial", 11, "bold"), bg="#89b4fa", fg="#11111b", width=25, command=run_save, bd=0, cursor="hand2")
+btn_run_save.pack(pady=15)
+
+# --- TAB 2: LOAD ---
+tab_load = tk.Frame(notebook, bg="#1e1e2e")
+notebook.add(tab_load, text=" LOAD ")
+
+tk.Label(tab_load, text="PILIH DATA YANG MAU DI-LOAD:", font=("Arial", 10, "bold"), bg="#1e1e2e", fg="#a6adc8").pack(pady=10)
+tk.Checkbutton(tab_load, text="ALL (PILIH SEMUA)", variable=load_all_var, command=toggle_load_all, bg="#1e1e2e", fg="#f9e2af", selectcolor="#313244", activebackground="#1e1e2e", activeforeground="#f9e2af", font=("Arial", 10, "bold")).pack(anchor="w", padx=40, pady=2)
+tk.Checkbutton(tab_load, text="GOOGLE CHROME", variable=load_chrome_var, bg="#1e1e2e", fg="#cdd6f4", selectcolor="#313244", activebackground="#1e1e2e", activeforeground="#cdd6f4").pack(anchor="w", padx=60, pady=2)
+tk.Checkbutton(tab_load, text="ROBLOX STUDIO", variable=load_roblox_var, bg="#1e1e2e", fg="#cdd6f4", selectcolor="#313244", activebackground="#1e1e2e", activeforeground="#cdd6f4").pack(anchor="w", padx=60, pady=2)
+tk.Checkbutton(tab_load, text="MICROSOFT EDGE", variable=load_edge_var, bg="#1e1e2e", fg="#cdd6f4", selectcolor="#313244", activebackground="#1e1e2e", activeforeground="#cdd6f4").pack(anchor="w", padx=60, pady=2)
+
+btn_run_load = tk.Button(tab_load, text="⚡ DOWNLOAD & RESTORE", font=("Arial", 11, "bold"), bg="#a6e3a1", fg="#11111b", width=25, command=run_load, bd=0, cursor="hand2")
+btn_run_load.pack(pady=15)
+
+# --- TAB 3: CREDIT ---
+tab_credit = tk.Frame(notebook, bg="#1e1e2e")
+notebook.add(tab_credit, text=" CREDIT ")
+
+tk.Label(tab_credit, text="THANKS TO", font=("Arial", 12, "bold"), bg="#1e1e2e", fg="#f38ba8").pack(pady=15)
+tk.Label(tab_credit, text="👑 RAPZZ DEV", font=("Arial", 14, "bold"), bg="#1e1e2e", fg="#cba6f7").pack(pady=5)
+tk.Label(tab_credit, text="🤖 GEMINI (FOR CODE)", font=("Arial", 11, "italic"), bg="#1e1e2e", fg="#94e2d5").pack(pady=5)
+
+# Status Footer Bar
+status_label = tk.Label(root, text="Status: Ready", font=("Arial", 9, "italic"), bg="#1e1e2e", fg="#a6adc8")
+status_label.pack(side="bottom", fill="x", pady=5)
 
 root.mainloop()
-  
