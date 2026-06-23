@@ -49,7 +49,6 @@ def upload_to_catbox(file_path):
     with urllib.request.urlopen(req) as response:
         return response.read().decode('utf-8').strip()
 
-# Fungsi Otomatis Centang Semua (ALL)
 def toggle_save_all():
     val = save_all_var.get()
     save_chrome_var.set(val)
@@ -62,7 +61,6 @@ def toggle_load_all():
     load_roblox_var.set(val)
     load_edge_var.set(val)
 
-# Eksekusi Save
 def run_save():
     if not (save_chrome_var.get() or save_roblox_var.get() or save_edge_var.get()):
         messagebox.showwarning("Peringatan", "Pilih minimal satu aplikasi untuk di-save!")
@@ -70,18 +68,16 @@ def run_save():
         
     try:
         update_status("Membuat file backup... Mohon tunggu.", "#f9e2af")
+        root.update()
         
         if os.path.exists(TEMP_ZIP):
             os.remove(TEMP_ZIP)
 
         with zipfile.ZipFile(TEMP_ZIP, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            # Save Chrome
             if save_chrome_var.get() and os.path.exists(CHROME_PATH):
                 backup_folder(CHROME_PATH, zipf, 'Chrome')
-            # Save Edge
             if save_edge_var.get() and os.path.exists(EDGE_PATH):
                 backup_folder(EDGE_PATH, zipf, 'Edge')
-            # Save Roblox
             if save_roblox_var.get():
                 try:
                     os.system(f'reg export "HKEY_CURRENT_USER\\{ROBLOX_REG_PATH}" "{ROBLOX_REG_FILE}" /y')
@@ -106,7 +102,6 @@ def run_save():
         update_status("Proses Save Gagal!", "#f38ba8")
         messagebox.showerror("Error", f"Terjadi kesalahan: {str(e)}")
 
-# Eksekusi Load
 def run_load():
     if not (load_chrome_var.get() or load_roblox_var.get() or load_edge_var.get()):
         messagebox.showwarning("Peringatan", "Pilih minimal satu aplikasi untuk di-load!")
@@ -131,7 +126,6 @@ def run_load():
         with zipfile.ZipFile(TEMP_ZIP, 'r') as zip_ref:
             zip_ref.extractall(temp_extract)
 
-        # Restore berdasarkan pilihan
         if load_chrome_var.get() and os.path.exists(os.path.join(temp_extract, 'Chrome')):
             if os.path.exists(CHROME_PATH): shutil.rmtree(CHROME_PATH)
             shutil.copytree(os.path.join(temp_extract, 'Chrome'), CHROME_PATH)
@@ -155,76 +149,58 @@ def run_load():
 def update_status(text, color):
     status_label.config(text=f"Status: {text}", fg=color)
 
-# Setup GUI Utama
+# --- INITIALIZE GUI ---
 root = tk.Tk()
 root.title("Rapzz Save Manager")
 root.geometry("450x380")
 root.configure(bg="#1e1e2e")
 
-# Custom UI Style untuk Tab Kontrol
 style = ttk.Style()
 style.theme_use('default')
 style.configure('TNotebook', background='#1e1e2e', borderwidth=0)
 style.configure('TNotebook.Tab', background='#313244', foreground='#cdd6f4', padding=[15, 5], font=('Arial', 10, 'bold'))
 style.map('TNotebook.Tab', background=[('selected', '#b4befe')], foreground=[('selected', '#11111b')])
 
-# Header Banner
-header_frame = tk.Frame(root, bg="#11111b", padding=10)
+# FIXED BUG: Mengubah padding=10 menjadi padx=10, pady=10 agar tk.Frame tidak crash
+header_frame = tk.Frame(root, bg="#11111b", padx=10, pady=10)
 header_frame.pack(fill="x")
 logo_title = tk.Label(header_frame, text="🤖 Rapzz Save Manager", font=("Arial", 16, "bold"), bg="#11111b", fg="#cba6f7")
 logo_title.pack()
 
-# Tab System
 notebook = ttk.Notebook(root)
 notebook.pack(fill="both", expand=True, padx=10, pady=10)
 
-# Variabel Checkbox (Save)
-save_all_var = tk.BooleanVar()
-save_chrome_var = tk.BooleanVar(value=True)
-save_roblox_var = tk.BooleanVar()
-save_edge_var = tk.BooleanVar()
+# Variabel Checkbox
+save_all_var, save_chrome_var, save_roblox_var, save_edge_var = tk.BooleanVar(), tk.BooleanVar(value=True), tk.BooleanVar(), tk.BooleanVar()
+load_all_var, load_chrome_var, load_roblox_var, load_edge_var = tk.BooleanVar(), tk.BooleanVar(value=True), tk.BooleanVar(), tk.BooleanVar()
 
-# Variabel Checkbox (Load)
-load_all_var = tk.BooleanVar()
-load_chrome_var = tk.BooleanVar(value=True)
-load_roblox_var = tk.BooleanVar()
-load_edge_var = tk.BooleanVar()
-
-# --- TAB 1: SAVE ---
+# TAB 1: SAVE
 tab_save = tk.Frame(notebook, bg="#1e1e2e")
 notebook.add(tab_save, text=" SAVE ")
-
 tk.Label(tab_save, text="PILIH DATA YANG MAU DI-SAVE:", font=("Arial", 10, "bold"), bg="#1e1e2e", fg="#a6adc8").pack(pady=10)
-tk.Checkbutton(tab_save, text="ALL (PILIH SEMUA)", variable=save_all_var, command=toggle_save_all, bg="#1e1e2e", fg="#f9e2af", selectcolor="#313244", activebackground="#1e1e2e", activeforeground="#f9e2af", font=("Arial", 10, "bold")).pack(anchor="w", padx=40, pady=2)
-tk.Checkbutton(tab_save, text="GOOGLE CHROME", variable=save_chrome_var, bg="#1e1e2e", fg="#cdd6f4", selectcolor="#313244", activebackground="#1e1e2e", activeforeground="#cdd6f4").pack(anchor="w", padx=60, pady=2)
-tk.Checkbutton(tab_save, text="ROBLOX STUDIO", variable=save_roblox_var, bg="#1e1e2e", fg="#cdd6f4", selectcolor="#313244", activebackground="#1e1e2e", activeforeground="#cdd6f4").pack(anchor="w", padx=60, pady=2)
-tk.Checkbutton(tab_save, text="MICROSOFT EDGE", variable=save_edge_var, bg="#1e1e2e", fg="#cdd6f4", selectcolor="#313244", activebackground="#1e1e2e", activeforeground="#cdd6f4").pack(anchor="w", padx=60, pady=2)
+tk.Checkbutton(tab_save, text="ALL (PILIH SEMUA)", variable=save_all_var, command=toggle_save_all, bg="#1e1e2e", fg="#f9e2af", selectcolor="#313244", font=("Arial", 10, "bold")).pack(anchor="w", padx=40, pady=2)
+tk.Checkbutton(tab_save, text="GOOGLE CHROME", variable=save_chrome_var, bg="#1e1e2e", fg="#cdd6f4", selectcolor="#313244").pack(anchor="w", padx=60, pady=2)
+tk.Checkbutton(tab_save, text="ROBLOX STUDIO", variable=save_roblox_var, bg="#1e1e2e", fg="#cdd6f4", selectcolor="#313244").pack(anchor="w", padx=60, pady=2)
+tk.Checkbutton(tab_save, text="MICROSOFT EDGE", variable=save_edge_var, bg="#1e1e2e", fg="#cdd6f4", selectcolor="#313244").pack(anchor="w", padx=60, pady=2)
+tk.Button(tab_save, text="🔥 EXECUTE AUTO SAVE", font=("Arial", 11, "bold"), bg="#89b4fa", fg="#11111b", width=25, command=run_save, bd=0, cursor="hand2").pack(pady=15)
 
-btn_run_save = tk.Button(tab_save, text="🔥 EXECUTE AUTO SAVE", font=("Arial", 11, "bold"), bg="#89b4fa", fg="#11111b", width=25, command=run_save, bd=0, cursor="hand2")
-btn_run_save.pack(pady=15)
-
-# --- TAB 2: LOAD ---
+# TAB 2: LOAD
 tab_load = tk.Frame(notebook, bg="#1e1e2e")
 notebook.add(tab_load, text=" LOAD ")
-
 tk.Label(tab_load, text="PILIH DATA YANG MAU DI-LOAD:", font=("Arial", 10, "bold"), bg="#1e1e2e", fg="#a6adc8").pack(pady=10)
-tk.Checkbutton(tab_load, text="ALL (PILIH SEMUA)", variable=load_all_var, command=toggle_load_all, bg="#1e1e2e", fg="#f9e2af", selectcolor="#313244", activebackground="#1e1e2e", activeforeground="#f9e2af", font=("Arial", 10, "bold")).pack(anchor="w", padx=40, pady=2)
-tk.Checkbutton(tab_load, text="GOOGLE CHROME", variable=load_chrome_var, bg="#1e1e2e", fg="#cdd6f4", selectcolor="#313244", activebackground="#1e1e2e", activeforeground="#cdd6f4").pack(anchor="w", padx=60, pady=2)
-tk.Checkbutton(tab_load, text="ROBLOX STUDIO", variable=load_roblox_var, bg="#1e1e2e", fg="#cdd6f4", selectcolor="#313244", activebackground="#1e1e2e", activeforeground="#cdd6f4").pack(anchor="w", padx=60, pady=2)
-tk.Checkbutton(tab_load, text="MICROSOFT EDGE", variable=load_edge_var, bg="#1e1e2e", fg="#cdd6f4", selectcolor="#313244", activebackground="#1e1e2e", activeforeground="#cdd6f4").pack(anchor="w", padx=60, pady=2)
+tk.Checkbutton(tab_load, text="ALL (PILIH SEMUA)", variable=load_all_var, command=toggle_load_all, bg="#1e1e2e", fg="#f9e2af", selectcolor="#313244", font=("Arial", 10, "bold")).pack(anchor="w", padx=40, pady=2)
+tk.Checkbutton(tab_load, text="GOOGLE CHROME", variable=load_chrome_var, bg="#1e1e2e", fg="#cdd6f4", selectcolor="#313244").pack(anchor="w", padx=60, pady=2)
+tk.Checkbutton(tab_load, text="ROBLOX STUDIO", variable=load_roblox_var, bg="#1e1e2e", fg="#cdd6f4", selectcolor="#313244").pack(anchor="w", padx=60, pady=2)
+tk.Checkbutton(tab_load, text="MICROSOFT EDGE", variable=load_edge_var, bg="#1e1e2e", fg="#cdd6f4", selectcolor="#313244").pack(anchor="w", padx=60, pady=2)
+tk.Button(tab_load, text="⚡ DOWNLOAD & RESTORE", font=("Arial", 11, "bold"), bg="#a6e3a1", fg="#11111b", width=25, command=run_load, bd=0, cursor="hand2").pack(pady=15)
 
-btn_run_load = tk.Button(tab_load, text="⚡ DOWNLOAD & RESTORE", font=("Arial", 11, "bold"), bg="#a6e3a1", fg="#11111b", width=25, command=run_load, bd=0, cursor="hand2")
-btn_run_load.pack(pady=15)
-
-# --- TAB 3: CREDIT ---
+# TAB 3: CREDIT
 tab_credit = tk.Frame(notebook, bg="#1e1e2e")
 notebook.add(tab_credit, text=" CREDIT ")
-
 tk.Label(tab_credit, text="THANKS TO", font=("Arial", 12, "bold"), bg="#1e1e2e", fg="#f38ba8").pack(pady=15)
 tk.Label(tab_credit, text="👑 RAPZZ DEV", font=("Arial", 14, "bold"), bg="#1e1e2e", fg="#cba6f7").pack(pady=5)
 tk.Label(tab_credit, text="🤖 GEMINI (FOR CODE)", font=("Arial", 11, "italic"), bg="#1e1e2e", fg="#94e2d5").pack(pady=5)
 
-# Status Footer Bar
 status_label = tk.Label(root, text="Status: Ready", font=("Arial", 9, "italic"), bg="#1e1e2e", fg="#a6adc8")
 status_label.pack(side="bottom", fill="x", pady=5)
 
