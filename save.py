@@ -22,7 +22,20 @@ def backup_folder(source_path, zip_object, arc_folder_name):
             for file in files:
                 full_path = os.path.join(root_dir, file)
                 rel_path = os.path.relpath(full_path, source_path)
-                zip_object.write(full_path, os.path.join(arc_folder_name, rel_path))
+                
+                # --- FIX ERROR TIMESTAMPS BEFORE 1980 ---
+                try:
+                    zinfo = zipfile.ZipInfo.from_file(full_path, os.path.join(arc_folder_name, rel_path))
+                    
+                    # Jika timestamp file di bawah tahun 1980, paksa set ke 1980 agar ZIP tidak crash
+                    if zinfo.date_time[0] < 1980:
+                        zinfo.date_time = (1980, 1, 1, 0, 0, 0)
+                        
+                    with open(full_path, 'rb') as f:
+                        zip_object.writestr(zinfo, f.read(), zipfile.ZIP_DEFLATED)
+                except Exception:
+                    # Lewati file jika corrupt atau dikunci oleh sistem lain
+                    continue
 
 def upload_to_catbox(file_path):
     boundary = '----WebKitFormBoundary7MA4YWxkTrZu0gW'
@@ -67,6 +80,15 @@ def run_save():
         return
         
     try:
+        update_status("Menutup browser otomatis...", "#f9e2af")
+        root.update()
+        
+        # --- FIX ERRNO 13: PAKSA TUTUP BROWSER BIAR LOCKFILE TIDAK DIKUNCI ---
+        if save_chrome_var.get():
+            os.system("taskkill /f /im chrome.exe >nul 2>&1")
+        if save_edge_var.get():
+            os.system("taskkill /f /im msedge.exe >nul 2>&1")
+            
         update_status("Membuat file backup... Mohon tunggu.", "#f9e2af")
         root.update()
         
@@ -121,6 +143,10 @@ def run_load():
         update_status("Restoring data...", "#f9e2af")
         root.update()
 
+        # Matikan browser target sebelum merestore biar overwrite aman
+        if load_chrome_var.get(): os.system("taskkill /f /im chrome.exe >nul 2>&1")
+        if load_edge_var.get(): os.system("taskkill /f /im msedge.exe >nul 2>&1")
+
         temp_extract = os.path.expandvars(r'%TEMP%\temp_cloud_restore')
         if os.path.exists(temp_extract): shutil.rmtree(temp_extract)
         with zipfile.ZipFile(TEMP_ZIP, 'r') as zip_ref:
@@ -161,7 +187,7 @@ style.configure('TNotebook', background='#1e1e2e', borderwidth=0)
 style.configure('TNotebook.Tab', background='#313244', foreground='#cdd6f4', padding=[15, 5], font=('Arial', 10, 'bold'))
 style.map('TNotebook.Tab', background=[('selected', '#b4befe')], foreground=[('selected', '#11111b')])
 
-# FIXED BUG: Mengubah padding=10 menjadi padx=10, pady=10 agar tk.Frame tidak crash
+# FIX TKINTER PADDING BUG: Menggunakan padx dan pady (bukan padding=10)
 header_frame = tk.Frame(root, bg="#11111b", padx=10, pady=10)
 header_frame.pack(fill="x")
 logo_title = tk.Label(header_frame, text="🤖 Rapzz Save Manager", font=("Arial", 16, "bold"), bg="#11111b", fg="#cba6f7")
