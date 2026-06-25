@@ -20,9 +20,6 @@ import urllib3
 warnings.filterwarnings('ignore')
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# Konfigurasi API Base (Sesuai permintaan)
-API_BASE = 'http://node.ngr.web.id:4506'
-
 REGION_CHOICE = 1
 THREAD_COUNT = 222
 REQUEST_DELAY = 0
@@ -75,7 +72,7 @@ class Colors:
 C = Colors()
 
 def generate_cool_name():
-    base = 'VITIAN'
+    base = 'Vitian'
     num = random.randint(10, 999)
     pattern = random.choice([1, 2, 3, 4, 5, 6])
     
@@ -387,7 +384,7 @@ def count_same_digits(account_id):
     return max(digit_counts.values()) if digit_counts else 0
 
 def save_account_v3(account_data, user_hash):
-    base_folder = 'VITIANGEN'
+    base_folder = 'Vitian'
     all_folder = os.path.join(base_folder, 'allaccount')
     os.makedirs(all_folder, exist_ok=True)
     accounts_json = os.path.join(all_folder, 'accounts.json')
@@ -586,7 +583,7 @@ def main():
     time.sleep(1)
     elapsed = time.time() - stats['start_time']
     print()
-    print(f"{C.CYAN}VITIAN V3 - DONE{C.RESET}")
+    print(f"{C.CYAN}VITIAN V12 - DONE{C.RESET}")
     print(f"{C.GREEN}[TOTAL] {stats['total']}{C.RESET}")
     print(f"{C.YELLOW}[SAME4+] {stats['same_4plus']}{C.RESET}")
     print(f"{C.CYAN}[TIME] {elapsed:.1f}s{C.RESET}")
